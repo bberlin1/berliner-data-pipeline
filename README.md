@@ -39,6 +39,15 @@ sam deploy --guided
 #   Save arguments to configuration file: Y
 #   Confirm changes before deploy: N
 ```
+## Architecture
+
+![Berliner Data Pipeline Architecture](berliner-data-pipeline-architecture.png)
+
+**Flow:**  
+EventBridge → Lambda → (S3 Raw, DynamoDB Summary) → Function URL (GET)
+
+This design keeps the stack fully serverless, using AWS Free Tier–eligible services and minimal components to demonstrate an end-to-end data flow with near-zero ongoing cost.  
+It’s structured for clarity and portability, so you can swap the synthetic data generator for a real data source with minimal changes.
 
 ### After deploy
 - SAM will print an output named **FunctionUrl**. Copy it.

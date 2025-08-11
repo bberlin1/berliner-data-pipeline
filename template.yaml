@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless, near-free data pipeline demo (S3 + DynamoDB + Lambda URL + daily schedule).
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 128
+    Tracing: Active
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref MetricsTable
+        BUCKET_NAME: !Ref RawBucket
+
+Resources:
+  RawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Suspended
+
+  MetricsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+
+  PipelineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handler
+      Handler: app.lambda_handler
+      Description: Generates raw data, summarizes to DynamoDB, and serves GET via Function URL.
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:GetObject
+                - s3:ListBucket
+              Resource:
+                - !Sub ${RawBucket.Arn}
+                - !Sub ${RawBucket.Arn}/*
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:Query
+              Resource: !GetAtt MetricsTable.Arn
+      Events:
+        DailySchedule:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 day)
+            Name: BerlinerDailyRun
+            Description: Daily run to generate small dataset and write metrics.
+            Enabled: true
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+            - '*'
+          AllowMethods:
+            - GET
+
+Outputs:
+  FunctionUrl:
+    Description: Public URL for latest metrics (GET only).
+    Value: !GetAtt PipelineFunctionUrl.FunctionUrl
+  PipelineFunction:
+    Description: Lambda function name (for manual invoke/testing).
+    Value: !Ref PipelineFunction
+  BucketName:
+    Description: S3 bucket for raw JSON objects.
+    Value: !Ref RawBucket
+  TableName:
+    Description: DynamoDB table name.
+    Value: !Ref MetricsTable

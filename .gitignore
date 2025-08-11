@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.localstack/
+.aws-sam/
+*.pyc
+*.zip
+out/
